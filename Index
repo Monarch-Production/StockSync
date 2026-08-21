@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockMatch - Smart Data Matching & Reconciliation</title>
+  <!-- Pustaka SheetJS Pembaca Excel Kilat -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; margin: 0; padding: 0; }
+    body { background-color: #f8fafc; color: #334155; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 24px; }
+    .container { background: #ffffff; border-radius: 16px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02); width: 100%; max-width: 680px; padding: 36px; border: 1px solid #e2e8f0; }
+    
+    /* AREA LOGO (Dapat Kamu Sesuaikan/Tambahkan Gambar Logo di GitHub) */
+    .brand-logo { text-align: center; margin-bottom: 12px; }
+    .brand-logo img { max-width: 160px; height: auto; }
+
+    h2 { font-size: 24px; font-weight: 700; color: #0f172a; text-align: center; margin-bottom: 6px; }
+    p.subtitle { font-size: 14px; color: #64748b; text-align: center; margin-bottom: 28px; }
+    
+    .upload-group { margin-bottom: 22px; }
+    .upload-label { font-size: 13px; font-weight: 700; color: #334155; margin-bottom: 8px; display: block; text-transform: uppercase; letter-spacing: 0.5px; }
+    
+    /* DROPZONE INTERAKTIF */
+    .dropzone {
+      width: 100%;
+      min-height: 120px;
+      border: 2px dashed #cbd5e1;
+      border-radius: 12px;
+      background: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      cursor: pointer;
+      transition: all 0.25s ease-in-out;
+      text-align: center;
+    }
+    .dropzone:hover { border-color: #1e4620; background: #f0f7f1; }
+    .dropzone.dragover { border-color: #1e4620; background-color: #e8f5e9; transform: scale(1.01); }
+    .dropzone .icon { font-size: 28px; color: #64748b; margin-bottom: 8px; }
+    .dropzone .text-main { font-size: 14px; font-weight: 600; color: #475569; }
+    .dropzone .text-sub { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+    .dropzone .file-name { font-size: 13px; font-weight: 700; color: #1e4620; background: #d9f2e6; padding: 6px 14px; border-radius: 20px; margin-top: 8px; display: none; word-break: break-all; }
+    .file-input-hidden { display: none; }
+
+    .btn-submit { width: 100%; background: #1e4620; color: white; border: none; padding: 14px; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 10px; transition: background 0.2s; }
+    .btn-submit:hover { background: #2d6a30; }
+    .btn-submit:disabled { background: #94a3b8; cursor: not-allowed; }
+
+    .loading-status { display: none; text-align: center; margin-top: 20px; font-size: 14px; color: #1e4620; font-weight: 600; }
+    .error-box { display: none; background: #fee2e2; border: 1px solid #fca5a5; color: #b91c1c; padding: 12px 16px; border-radius: 10px; font-size: 13px; margin-top: 20px; }
+
+    /* SUMMARY PANEL UI */
+    .summary-box { display: none; margin-top: 28px; border-top: 2px dashed #e2e8f0; padding-top: 24px; }
+    .summary-title { font-size: 17px; font-weight: 700; color: #0f172a; margin-bottom: 16px; text-align: center; }
+    .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+    .summary-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; }
+    .summary-card .label { font-size: 12px; color: #64748b; }
+    .summary-card .value { font-size: 18px; font-weight: 700; color: #0f172a; margin-top: 2px; }
+
+    .btn-action-group { display: flex; gap: 12px; }
+    .btn-download { flex: 2; text-align: center; background: #1e4620; color: white; text-decoration: none; padding: 13px; border-radius: 10px; font-size: 14px; font-weight: 600; }
+    .btn-download:hover { background: #2d6a30; }
+    .btn-reset { flex: 1; text-align: center; background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; padding: 13px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .btn-reset:hover { background: #e2e8f0; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- TEMPAT LOGO LOKAL DARI GITHUB (Opsional) -->
+  <div class="brand-logo">
+    <!-- <img src="logo.png" alt="StockMatch Logo"> -->
+  </div>
+
+  <h2>StockMatch</h2>
+  <p class="subtitle">Smart Data Matching & Reconciliation</p>
+
+  <form id="uploadForm">
+    <div class="upload-group">
+      <label class="upload-label">1. DATA UTAMA</label>
+      <div class="dropzone" id="dropzoneUtama" onclick="document.getElementById('fileUtama').click()">
+        <div class="icon">📄</div>
+        <div class="text-main">Unggah dokumen Excel di sini atau <span style="color:#1e4620; text-decoration:underline;">klik untuk memilih file</span></div>
+        <div class="text-sub">Format yang didukung: .xlsx, .xls</div>
+        <div class="file-name" id="fileNameUtama"></div>
+      </div>
+      <input type="file" id="fileUtama" class="file-input-hidden" accept=".xlsx, .xls" required>
+    </div>
+
+    <div class="upload-group">
+      <label class="upload-label">2. DATA PEMBANDING</label>
+      <div class="dropzone" id="dropzonePembanding" onclick="document.getElementById('filePembanding').click()">
+        <div class="icon">📊</div>
+        <div class="text-main">Unggah dokumen Excel di sini atau <span style="color:#1e4620; text-decoration:underline;">klik untuk memilih file</span></div>
+        <div class="text-sub">Format yang didukung: .xlsx, .xls</div>
+        <div class="file-name" id="fileNamePembanding"></div>
+      </div>
+      <input type="file" id="filePembanding" class="file-input-hidden" accept=".xlsx, .xls" required>
+    </div>
+
+    <button type="submit" id="btnProcess" class="btn-submit">Run Reconciliation</button>
+  </form>
+
+  <div id="loadingStatus" class="loading-status">Memproses dan menganalisis rekonsiliasi data...</div>
+  <div id="errorBox" class="error-box"></div>
+
+  <div id="summaryBox" class="summary-box">
+    <div class="summary-title">Ringkasan Hasil Rekonsiliasi</div>
+    <div class="summary-grid">
+      <div class="summary-card"><div class="label">Jumlah SKU Awal</div><div class="value" id="resSkuAwal">0</div></div>
+      <div class="summary-card"><div class="label">Jumlah SKU Tambahan</div><div class="value" id="resSkuTambahan">0</div></div>
+      <div class="summary-card"><div class="label">Jumlah SKU Akhir</div><div class="value" id="resSkuAkhir">0</div></div>
+      <div class="summary-card"><div class="label">Total LIVE STOCK</div><div class="value" id="resLiveStock">0</div></div>
+      <div class="summary-card"><div class="label">Total STOCK JUBE</div><div class="value" id="resStockJube">0</div></div>
+      <div class="summary-card"><div class="label">Jumlah MATCH</div><div class="value" style="color: #16a34a;" id="resMatch">0</div></div>
+      <div class="summary-card" style="grid-column: span 2;"><div class="label">Jumlah TIDAK MATCH</div><div class="value" style="color: #dc2626;" id="resUnmatch">0</div></div>
+    </div>
+
+    <div class="btn-action-group">
+      <a id="btnDownload" href="#" target="_blank" class="btn-download">Unduh Laporan Excel (.xlsx)</a>
+      <button type="button" class="btn-reset" onclick="resetForm()">Proses Ulang</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // URL APPS SCRIPT KAMU SUDAH TERSAMBUNG LENGKAP
+  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx-hXhIZ8j_9Oj7eCQaMcSxLPvnIlxDbkuVy5pEoDSAcbiX91Gln-0VOtUjwvXjTffj1A/exec";
+
+  setupDropzone('dropzoneUtama', 'fileUtama', 'fileNameUtama');
+  setupDropzone('dropzonePembanding', 'filePembanding', 'fileNamePembanding');
+
+  function setupDropzone(dropzoneId, inputId, fileNameId) {
+    const dropzone = document.getElementById(dropzoneId);
+    const input = document.getElementById(inputId);
+    const fileNameDisplay = document.getElementById(fileNameId);
+
+    ['dragenter', 'dragover'].forEach(eName => {
+      dropzone.addEventListener(eName, (e) => { e.preventDefault(); e.stopPropagation(); dropzone.classList.add('dragover'); }, false);
+    });
+    ['dragleave', 'drop'].forEach(eName => {
+      dropzone.addEventListener(eName, (e) => { e.preventDefault(); e.stopPropagation(); dropzone.classList.remove('dragover'); }, false);
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      if (e.dataTransfer.files.length > 0) {
+        input.files = e.dataTransfer.files;
+        updateFileName(input, fileNameDisplay);
+      }
+    });
+
+    input.addEventListener('change', () => updateFileName(input, fileNameDisplay));
+  }
+
+  function updateFileName(input, displayElem) {
+    if (input.files && input.files[0]) {
+      displayElem.innerText = '✓ ' + input.files[0].name;
+      displayElem.style.display = 'inline-block';
+    } else {
+      displayElem.style.display = 'none';
+    }
+  }
+
+  document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const fileUtamaInput = document.getElementById('fileUtama').files[0];
+    const filePembandingInput = document.getElementById('filePembanding').files[0];
+
+    if (!fileUtamaInput || !filePembandingInput) {
+      showError('Harap pilih kedua dokumen terlebih dahulu.');
+      return;
+    }
+
+    setLoading(true);
+    hideError();
+    document.getElementById('summaryBox').style.display = 'none';
+
+    try {
+      const dataUtama = await bacaExcelBrowser(fileUtamaInput);
+      const dataPembanding = await bacaExcelBrowser(filePembandingInput);
+
+      const response = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ dataUtama, dataPembanding })
+      });
+
+      const resJson = await response.json();
+      handleSuccess(resJson);
+
+    } catch (err) {
+      setLoading(false);
+      showError('Terjadi kesalahan pemrosesan: ' + err.message);
+    }
+  });
+
+  function bacaExcelBrowser(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonRows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+          let result = [];
+          for (let i = 1; i < jsonRows.length; i++) {
+            const row = jsonRows[i];
+            if (!row) continue;
+            result.push({
+              sku: (row[0] !== undefined && row[0] !== null) ? String(row[0]).trim() : '',
+              qty: Number(row[1]) || 0
+            });
+          }
+          resolve(result);
+        } catch (err) { reject(err); }
+      };
+      reader.onerror = (err) => reject(error);
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  function handleSuccess(response) {
+    setLoading(false);
+    if (response.success) {
+      const s = response.summary;
+      document.getElementById('resSkuAwal').innerText = s.jumlahSkuAwal;
+      document.getElementById('resSkuTambahan').innerText = s.jumlahSkuTambahan;
+      document.getElementById('resSkuAkhir').innerText = s.jumlahSkuAkhir;
+      document.getElementById('resLiveStock').innerText = s.totalLiveStock;
+      document.getElementById('resStockJube').innerText = s.totalStockJube;
+      document.getElementById('resMatch').innerText = s.jumlahMatch;
+      document.getElementById('resUnmatch').innerText = s.jumlahTidakMatch;
+
+      document.getElementById('btnDownload').href = response.downloadUrl;
+      document.getElementById('summaryBox').style.display = 'block';
+    } else {
+      showError(response.message);
+    }
+  }
+
+  function setLoading(isLoading) {
+    document.getElementById('btnProcess').disabled = isLoading;
+    document.getElementById('loadingStatus').style.display = isLoading ? 'block' : 'none';
+  }
+
+  function showError(msg) {
+    const box = document.getElementById('errorBox');
+    box.innerText = msg;
+    box.style.display = 'block';
+  }
+
+  function hideError() {
+    document.getElementById('errorBox').style.display = 'none';
+  }
+
+  function resetForm() {
+    document.getElementById('uploadForm').reset();
+    document.getElementById('fileNameUtama').style.display = 'none';
+    document.getElementById('fileNamePembanding').style.display = 'none';
+    document.getElementById('summaryBox').style.display = 'none';
+    hideError();
+  }
+</script>
+
+</body>
+</html>
